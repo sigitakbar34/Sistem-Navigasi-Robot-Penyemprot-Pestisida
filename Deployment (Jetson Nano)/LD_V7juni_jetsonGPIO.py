@@ -1,0 +1,207 @@
+import cv2
+import numpy as np
+import utils_V7juni_jetson
+from ultralytics import YOLO
+import time
+import Jetson.GPIO as GPIO
+import csv
+import torch
+import config
+
+
+switch_pin = 4  # BCM pin 4, BOARD pin 7
+start_time = None
+
+last_mask_time = time.time()
+
+
+# Fungsi untuk menyimpan hasil deteksi ke dalam file CSV
+def save_to_csv(class_name, confidence, inference_time, fps):
+    # global start_time
+    fields = ['Detik', 'Jalur', 'Ujung Jalur', 'Confidence Jalur', 'Confidence Ujung Jalur', 'Inference Time', 'FPS', 'errorPos']
+    data_row = ['', '', '', '', '', '', '', '']  # Inisialisasi baris data dengan nilai kosong
+    errorPos = config.errorPos
+    # Hitung waktu detik sejak proses dimulai
+    # current_time = time.time()
+    # detik = round((current_time - start_time),2)
+    detik = utils_V7juni_jetson.get_elapsed_time()
+    # detik = elapsed_time_global
+    print(f"Elapsed Time (detik): {detik}") 
+
+    if class_name == 'jalur':
+        data_row[1] = class_name
+        data_row[3] = f"{confidence:.2f}"
+    elif class_name == 'ujung-jalur':
+        data_row[2] = class_name
+        data_row[4] = f"{confidence:.2f}"
+
+    data_row[0] = detik  # Simpan waktu detik
+    data_row[5] = f"{inference_time:.1f}ms"
+    data_row[6] = f"{fps:.2f}"
+    data_row[7] = f"{errorPos:.2f}"
+
+    with open('detected_results.csv', mode='a', newline='') as file:
+        writer = csv.writer(file)
+        # Tulis header jika file masih kosong
+        if file.tell() == 0:
+            writer.writerow(fields)
+        # Tulis baris data
+        writer.writerow(data_row)
+
+def getLane(results, display=2):
+    global last_mask_time
+    frameCopy = frame.copy()
+
+    mask_np = utils_V7juni_jetson.masking(results, frame)
+    if mask_np is not None:
+        last_mask_time = time.time()  
+        points = utils_V7juni_jetson.valTrackbars()
+        hT, wT, c = frame.shape
+        
+        frameWarp = utils_V7juni_jetson.warping(mask_np, points, wT, hT)
+        if frameWarp is None or frameWarp.size == 0:
+            print("Error: frameWarp is invalid or has zero size.")
+            return
+        else: 
+            print("ada nilai framewarp")
+
+        frameWarpPoints = utils_V7juni_jetson.drawPoints(frameCopy, points)
+        processedImage = utils_V7juni_jetson.isEndOfLane(results, model, frameWarp, display=True)
+        if processedImage is None or processedImage.size == 0:
+            print("processedImage tidak ada nilainya ")
+            return
+        else: 
+            print("ada nilai processed image")
+            
+
+        if display == 1:
+            stack_img = utils_V7juni_jetson.stackImages(0.7, ([tampilResults, frameWarpPoints], [mask_np, frameWarp]))
+            cv2.imshow('Stacked Image', stack_img)
+            cv2.imshow('Processed Image', processedImage)
+
+        elif display == 2:
+            stack_img = utils_V7juni_jetson.stackImages(0.7, ([frameWarpPoints, mask_np], [frameWarp, processedImage]))
+            cv2.imshow('Stacked Image', stack_img)
+            
+    else:
+        current_time = time.time()
+        if current_time - last_mask_time > 15:
+            if cv2.getWindowProperty("Masking", cv2.WND_PROP_VISIBLE) > 0:
+                cv2.destroyWindow("Masking")
+            if cv2.getWindowProperty("Warp", cv2.WND_PROP_VISIBLE) > 0:
+                cv2.destroyWindow("Warp")
+            if cv2.getWindowProperty("Warp Points", cv2.WND_PROP_VISIBLE) > 0:
+                cv2.destroyWindow("Warp Points")
+            if cv2.getWindowProperty("Processed Image", cv2.WND_PROP_VISIBLE) > 0:
+                cv2.destroyWindow("Processed Image")
+            if cv2.getWindowProperty("Stacked Image", cv2.WND_PROP_VISIBLE) > 0:
+                cv2.destroyWindow("Stacked Image")
+            if cv2.getWindowProperty("Result Instance Segmentation", cv2.WND_PROP_VISIBLE) > 0:
+                cv2.destroyWindow("Result Instance Segmentation")
+
+def swt_onoff():
+    global deteksi_aktif
+    value = GPIO.input(switch_pin)
+    if value == GPIO.HIGH:
+        value_str = "OTOMATIS"
+        deteksi_aktif = True
+    else:
+        value_str = "MANUAL"
+        deteksi_aktif = False
+        
+    print("Mode:{}".format(value_str))
+
+
+if __name__ == '__main__':
+    try:     
+        GPIO.setmode(GPIO.BCM)  # BCM pin-numbering scheme from Raspberry Pi
+        GPIO.setup(switch_pin, GPIO.IN) 
+
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f'Using device: {device}')
+
+        model = YOLO("/home/semprot/sigit/7juni/best4juni_416.pt")
+        # model = YOLO("/home/semprot/sigit/1juli/416_ao.pt")
+        # model = YOLO("/home/semprot/sigit/1juli/416_nao.pt")
+
+        video_path = ("/home/semprot/sigit/Coding_jajal_v3_dataset_dewe_cara1_step1dadi_inputgbr/jal8.mp4")
+
+        cap = cv2.VideoCapture(0)
+        # cap = cv2.VideoCapture(video_path)
+
+        #  Inisialisasi trackbars
+        initializeTrackBarVals = [8, 128, 0, 179]
+        # initializeTrackBarVals = [8, 136, 0, 179]
+        utils_V7juni_jetson.initializeTrackbars(initializeTrackBarVals)
+        frameCounter = 0
+        start_time = time.time()
+
+        prev_time = 0
+        new_time = 0
+
+        while True:
+            swt_onoff()
+            if not cap.isOpened():
+                print("Gagal membuka video.")
+                exit()
+
+            frameCounter += 1
+            if cap.get(cv2.CAP_PROP_FRAME_COUNT) == frameCounter:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                frameCounter = 0
+
+            ret, video = cap.read()
+            if not ret:
+                print("Gagal membaca frame dari video.")
+                break
+            
+            frame = utils_V7juni_jetson.tambahkan_bingkai(video)
+            frame = cv2.resize(frame, (512, 256))
+
+            if deteksi_aktif:  # Periksa apakah deteksi aktif                
+                # results = model.predict(frame, imgsz=416, conf=0.5, stream_buffer=False, half=True)
+                # results = model.predict(frame, imgsz=320, conf=0.5, iou=0.7, stream_buffer=False, retina_masks=True)
+                results = model.predict(frame, imgsz=416, conf=0.5)
+
+                new_time = time.time()
+                fps = round((1/(new_time-prev_time)),2)
+                config.fps = fps
+                prev_time = new_time
+                print("FPS main: "+str(fps))
+
+                for result in results:  
+                    for box in result.boxes:
+                        class_name = result.names[int(box.cls)]
+                        confidence = float(box.conf) 
+                        # fps = utils_V7juni_jetson.fps_value
+                        inference_time = result.speed['inference']
+                        print(f"Detected: {class_name}, confidence: {confidence:.2f}, inference time (ms): {inference_time:.1f}, fps: {fps:.2f},")
+                        save_to_csv(class_name, confidence, inference_time, fps)
+                tampilResults = results[0].plot()
+                cv2.putText(tampilResults, f"FPS: {fps}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                getLane(results, display=2)            
+                cv2.imshow("Result Instance Segmentation", tampilResults) 
+
+            if not deteksi_aktif:
+                if cv2.getWindowProperty("Masking", cv2.WND_PROP_VISIBLE) > 0:
+                    cv2.destroyWindow("Masking")
+                if cv2.getWindowProperty("Warp", cv2.WND_PROP_VISIBLE) > 0:
+                    cv2.destroyWindow("Warp")
+                if cv2.getWindowProperty("Warp Points", cv2.WND_PROP_VISIBLE) > 0:
+                    cv2.destroyWindow("Warp Points")
+                if cv2.getWindowProperty("Processed Image", cv2.WND_PROP_VISIBLE) > 0:
+                    cv2.destroyWindow("Processed Image")
+                if cv2.getWindowProperty("Stacked Image", cv2.WND_PROP_VISIBLE) > 0:
+                    cv2.destroyWindow("Stacked Image")
+                if cv2.getWindowProperty("Result Instance Segmentation", cv2.WND_PROP_VISIBLE) > 0:
+                    cv2.destroyWindow("Result Instance Segmentation")
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+
+    except KeyboardInterrupt:
+        print("Proses berhenti.")
+        
+    finally:
+        # Tutup mode GPIO
+        GPIO.cleanup()
