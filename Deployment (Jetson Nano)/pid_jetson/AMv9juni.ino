@@ -2,7 +2,7 @@
 
 IBusBM IBus; 
 
-///pake driver sek iso maju tok
+///driver
 int motorRightPin1 = 12;
 int motorRightPin2 = 13;
 
@@ -23,20 +23,16 @@ int ledKuning = 32;
 int ledHijau = 33;
 
 ///durasi belok
-//int turnDuration = 4000;
 int turnDuration = 3500;
-
-//durasi maju 
-int fwdDuration = 1500;
 
 int motorSpeed;
 int motorTurn;
 
 unsigned long lastCommandTime = 0;
-unsigned long lastReceiveTime = 0; // Tambahkan variabel untuk waktu terakhir menerima data
+unsigned long lastReceiveTime = 0; // variabel untuk waktu terakhir menerima data
 
 unsigned long previousTime = 0;
-unsigned long sampleTime = 100; // Interval waktu untuk perhitungan PID (dalam milidetik)
+unsigned long sampleTime = 100; // Interval waktu untuk perhitungan PID 
 
 const unsigned long timeoutDuration = 100;
 const unsigned long timeoutDurationSTOP = 500;
@@ -51,21 +47,9 @@ float previousError = 0;
 float integral = 0;
 float pidValue = 0;
 
-//float kp = 3.5;
-//float ki = 0.000175;
-//float kd = 0.15;
-//float kp = 3.5;
-//float ki = 0.000075;
-//float kd = 0.4;
-
 float kp = 3.5;
 float ki = 0.00005;
 float kd = 0.4;
-
-//float kp=7.500000;
-//float ki= 0.000098;
-//float kd= 0.400000;
-
 
 ///channel FS
 int ch_3, ch_1, ch_5, ch_6, ch_7, ch_8;
@@ -204,29 +188,6 @@ void kiri(int leftSpeed, int rightSpeed) {
   analogWrite(motorRightPin2, 0);
 }
 
-
-//void kananUJ() {
-//  analogWrite(motorLeftPin1, 55);
-//  analogWrite(motorLeftPin2, 0);
-//  analogWrite(motorRightPin1, 0);
-//  analogWrite(motorRightPin2, 28);
-//}
-//
-//void kiriUJ() {
-//  analogWrite(motorLeftPin1, 0);
-//  analogWrite(motorLeftPin2, 28);
-//  analogWrite(motorRightPin1, 55);
-//  analogWrite(motorRightPin2, 0);
-//}
-//
-//void majuU() {
-//  analogWrite(motorLeftPin1, 35);
-//  analogWrite(motorLeftPin2, 0);
-//  analogWrite(motorRightPin1, 35);
-//  analogWrite(motorRightPin2, 0);
-//}
-
-
 void majuU() {
   analogWrite(motorLeftPin1, 45);
   analogWrite(motorLeftPin2, 0);
@@ -321,7 +282,6 @@ void otomatis() {
           Serial.println("MAJU DIKIT BWANG");
           Serial.println("");
           majuU();
-//          delay(fwdDuration);
 //          stopp();
 //          delay(1000);
 //          lastCommandTime = currentTime;
