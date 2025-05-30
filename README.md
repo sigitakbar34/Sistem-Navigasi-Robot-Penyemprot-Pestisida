@@ -5,6 +5,6 @@
 ###
 - Ketua: Muhammad Alfatih - [@alfatihmm](https://github.com/alfatihmm)
 - Anggota: Sigit Akbar Saputra - [@sigitakbar34](https://github.com/sigitakbar34)
-- Anggota: Yohanes Gilang Prasaja Putra - [@Yohgilang](https://github.com/Yohgilang)
 - Anggota: Lukman Pambudi - [@lukmanpambudi](https://github.com/lukmanpambudi)
+- Anggota: Yohanes Gilang Prasaja Putra - [@Yohgilang](https://github.com/Yohgilang)
 - Anggota: Krysna Yudha Maulana
